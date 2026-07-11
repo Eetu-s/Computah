@@ -1,8 +1,18 @@
+# Single, common compose for the whole system. The per-service folders no
+# longer carry their own docker-compose.yml — everything is defined here.
+#
 # Two speech-input paths, selected with the COMPOSE_PROFILES env var (see .env):
-#   COMPOSE_PROFILES=stt     -> cheap Moonshine STT  (mic + engine)
+#   COMPOSE_PROFILES=stt     -> cheap Moonshine STT  (mic)
 #   COMPOSE_PROFILES=agent   -> multimodal LLM       (agent + llama)
-# Only the selected profile's containers are built and started; the other
-# path is not included in the build at all.
+# Shared by both paths: computah-engine (command router) and computah-cast (TV).
+# Only the selected speech path is built and started.
+#
+# Routing is unified: mic and agent both POST commands to computah-engine, which
+# runs local commands and forwards device commands to computah-cast.
+#
+# All services use host networking — required by computah-cast (DLNA/WOL
+# multicast) and the mic containers (/dev/snd) — so they reach each other on
+# 127.0.0.1 (engine :9000, cast :8000, llama :8080).
 services:
   # ── STT path ───────────────────────────────────────────────────────────────
   # Microphone listener: transcribes speech from a USB mic, matches phrases to
@@ -18,11 +28,12 @@ services:
         MOONSHINE_MODEL: tiny
     image: computah-moonshine
     container_name: moonshine-mic
+    network_mode: host
     environment:
       MOONSHINE_MODEL: tiny
       OMP_NUM_THREADS: "4"
       # Base URL of the engine's commands; a matched command name is appended.
-      ENGINE_URL: "http://computah-engine:9000/commands"
+      ENGINE_URL: "http://127.0.0.1:9000/commands"
       # Optional: input device index (see `python -m sounddevice`).
       # MOONSHINE_MIC_DEVICE: "1"
     # Guard against runaway memory on a 4GB Pi.
@@ -36,38 +47,102 @@ services:
     depends_on:
       - computah-engine
 
-  # Command executor: runs a named command at POST /commands/<name>.
-  # Commands are modular — add one by dropping a module in engine/commands/.
-  # Shared infrastructure: runs under both speech paths
+  # ── Agent path ─────────────────────────────────────────────────────────────
+  # Gemma 4 with its audio encoder, behind an OpenAI-compatible API (llama.cpp,
+  # not Ollama). Weights are downloaded by hand into ./computah-agent/models
+  # (see computah-agent/README.md).
+  llama:
+    profiles: ["agent"]
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: computah-llama
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - ./computah-agent/models:/models
+    command: >
+      -m /models/gemma-4-E2B-it-Q8_0.gguf
+      --mmproj /models/mmproj-gemma-4-E2B-it-Q8_0.gguf
+      --jinja
+      --host 0.0.0.0 --port 8080
+      --ctx-size 8192
+      --threads 4
+    mem_limit: 6g
+
+  # Mic -> utterance -> Gemma -> tool call -> engine (which forwards to cast).
+  agent:
+    profiles: ["agent"]
+    build:
+      context: ./computah-agent
+    image: computah-agent:latest
+    container_name: computah-agent
+    network_mode: host
+    restart: unless-stopped
+    depends_on:
+      - llama
+      - computah-engine
+    environment:
+      LLAMA_URL: "http://127.0.0.1:8080"
+      # Commands routed through the engine, which forwards device calls to cast.
+      ENGINE_URL: "http://127.0.0.1:9000/commands"
+      # The model only acts when it hears this. Set to "" to act on everything.
+      WAKE_WORD: "computah"
+      # Set to "true" to log the chosen tool without running it (mic tuning).
+      DRY_RUN: "false"
+      LOG_LEVEL: "INFO"
+      # Raise if a noisy room self-triggers; lower if quiet speech is missed.
+      # VAD_THRESHOLD: "3.0"
+      # Input device index — see: python agent.py --list-devices
+      # MIC_DEVICE: "1"
+    devices:
+      - "/dev/snd:/dev/snd"
+    group_add:
+      - audio
+
+  # ── Shared infrastructure (runs under both paths) ───────────────────────────
+  # Command router: exposes POST /commands/<name>. Runs local commands (e.g.
+  # turn-on-led) and forwards device commands to computah-cast. Add commands by
+  # dropping a module in engine/commands/.
   computah-engine:
     profiles: ["stt", "agent"]
     build:
       context: ./engine
     image: computah-engine
     container_name: computah-engine
+    network_mode: host
     environment:
       PORT: "9000"
       COMMANDS_PREFIX: "/commands"
-    # Expose to the host too, so you can test with curl from your machine.
-    ports:
-      - "9000:9000"
+      # Where the engine forwards TV/display commands.
+      CAST_URL: "http://127.0.0.1:8000"
     restart: unless-stopped
-
-  # ── Agent path ─────────────────────────────────────────────────────────────
-  # Gemma 4 (audio) behind an OpenAI-compatible API, and the agent that drives
-  # it. Definitions are reused from ./computah-agent/docker-compose.yml so there
-  # is a single source of truth; here we only add the "agent" profile.
-  llama:
-    extends:
-      file: ./computah-agent/docker-compose.yml
-      service: llama
-    profiles: ["agent"]
-
-  agent:
-    extends:
-      file: ./computah-agent/docker-compose.yml
-      service: agent
-    profiles: ["agent"]
-    # extends does not carry depends_on across files, so restate it here.
     depends_on:
-      - llama
+      - computah-cast
+
+  # Hisense VIDAA TV control. host networking is REQUIRED so it can send/receive
+  # SSDP multicast (DLNA), broadcast Wake-on-LAN, and be reached by the TV on
+  # HTTP_PORT for the image.
+  computah-cast:
+    profiles: ["stt", "agent"]
+    build:
+      context: ./computah-cast
+    image: computah-cast:latest
+    container_name: computah-cast
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # --- target TV (change these) ---
+      TV_IP: "192.168.0.238"
+      TV_MAC: "ff:ff:ff:ff"
+      # --- how the image reaches the screen ---
+      DISPLAY_METHOD: "dlna"        # or "browser"
+      HTTP_PORT: "8000"
+      AUTO_CAST: "true"
+      WAKE_ON_CAST: "true"
+      # --- optional seed image (place a file in ./computah-cast/data) ---
+      # DEFAULT_IMAGE: "/data/default.jpg"
+      # --- MQTT control (power / pairing / keys) ---
+      MQTT_ENABLED: "true"
+      MQTT_TLS: "true"
+      # ADVERTISE_IP: "192.168.1.10"  # set if auto-detection picks the wrong NIC
+    volumes:
+      - ./computah-cast/data:/data

@@ -1,6 +1,7 @@
-"""Tools backed by computah-cast (../computah-cast) — the Hisense VIDAA TV.
+"""Tools for the Hisense VIDAA TV, routed through computah-engine.
 
-These are thin wrappers over its REST API; see its README for the full surface.
+The engine forwards these to computah-cast (../computah-cast). Going through the
+engine keeps STT and the LLM on one unified command path.
 """
 from __future__ import annotations
 
@@ -32,8 +33,11 @@ KEYS = [
 ]
 
 
-def _post(cfg, path: str, **kwargs):
-    resp = requests.post(f"{cfg.cast_url}{path}", timeout=cfg.cast_timeout, **kwargs)
+def _run(cfg, command: str, **kwargs):
+    """Trigger an engine command (which forwards to computah-cast)."""
+    resp = requests.post(
+        f"{cfg.engine_url}/{command}", timeout=cfg.engine_timeout, **kwargs
+    )
     resp.raise_for_status()
     return resp.json()
 
@@ -44,7 +48,7 @@ def _post(cfg, path: str, **kwargs):
     "off. Use for things like 'put the picture up', 'show it on the TV', 'cast it'.",
 )
 def cast_image(cfg):
-    return _post(cfg, "/cast")
+    return _run(cfg, "cast-image")
 
 
 @tool(
@@ -52,7 +56,7 @@ def cast_image(cfg):
     "Toggle the TV between on and standby. Use for 'turn the TV on/off'.",
 )
 def tv_power(cfg):
-    return _post(cfg, "/power")
+    return _run(cfg, "tv-power")
 
 
 @tool(
@@ -82,4 +86,4 @@ def tv_key(cfg, key: str):
         key = f"KEY_{key}"
     if key not in KEYS:
         raise ValueError(f"unsupported key {key!r}")
-    return _post(cfg, "/key", json={"key": key})
+    return _run(cfg, "tv-key", json={"key": key})

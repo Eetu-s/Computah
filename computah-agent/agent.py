@@ -81,7 +81,7 @@ def main() -> int:
     tools.load()
     gemma = Gemma(cfg, tools.specs(), tools.describe())
 
-    log.info("Gemma at %s, computah-cast at %s", cfg.llama_url, cfg.cast_url)
+    log.info("Gemma at %s, engine at %s", cfg.llama_url, cfg.engine_url)
     log.info(
         "wake word: %s%s",
         f"'{cfg.wake_word}'" if cfg.wake_word else "(none — every utterance acts)",

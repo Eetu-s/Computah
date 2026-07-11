@@ -43,9 +43,11 @@ mkdir -p models && REPO=https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/reso
 curl -L -o models/gemma-4-E2B-it-Q8_0.gguf        $REPO/gemma-4-E2B-it-Q8_0.gguf
 curl -L -o models/mmproj-gemma-4-E2B-it-Q8_0.gguf $REPO/mmproj-gemma-4-E2B-it-Q8_0.gguf
 
-# 2. Point CAST_URL at computah-cast (defaults to the same host, :8000).
-# 3. Bring up llama-server + the agent.
-docker compose up -d --build
+# 2. Bring up the agent path from the repo root. There is one common compose
+#    for the whole system; the "agent" profile starts llama + agent (plus the
+#    shared engine + cast). Commands are routed through computah-engine.
+cd ..
+COMPOSE_PROFILES=agent docker compose up -d --build
 docker compose logs -f
 ```
 

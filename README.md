@@ -45,8 +45,17 @@ path's containers are built and started — the other is not included at all.
 | `stt` (default) | `mic` | Cheap, offline Moonshine STT with exact phrase→command matching. |
 | `agent` | `agent` + `llama` | Multimodal LLM (Gemma 4 via llama.cpp) that interprets speech and picks tools. |
 
-`computah-engine` (the command executor) runs under **both** paths — it's shared
-infrastructure that will be used more over time.
+Both paths POST to the shared **`computah-engine`**, which runs local commands
+(e.g. `turn-on-led`) and forwards device commands to **`computah-cast`** (the
+TV). So routing is unified — one command surface for STT and the LLM alike.
+`computah-engine` and `computah-cast` run under **both** profiles.
+
+```
+              ┌── mic (stt) ──┐
+speech ───────┤               ├──▶ computah-engine ──▶ (local cmd, e.g. LED)
+              └─ agent (llm) ─┘         │
+                                        └──▶ computah-cast ──▶ TV (DLNA/WOL/MQTT)
+```
 
 ```bash
 make up              # uses the default from .env (stt)
@@ -57,9 +66,9 @@ make up-stt          # force the STT path
 COMPOSE_PROFILES=agent docker compose up -d --build
 ```
 
-Change the default by editing `COMPOSE_PROFILES` in `.env`. The `agent` path's
-service definitions are reused (via `extends`) from
-`computah-agent/docker-compose.yml`, so there's a single source of truth.
+Change the default by editing `COMPOSE_PROFILES` in `.env`. There is one common
+compose at the repo root that defines every service (the per-folder composes
+were removed) — a single source of truth.
 
 ## Building on an x86 machine for the Pi
 

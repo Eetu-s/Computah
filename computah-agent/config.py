@@ -55,6 +55,9 @@ class Config:
         self.log_level = env.get("LOG_LEVEL", "INFO").upper()
 
         # --- Tool targets ----------------------------------------------------
-        # Base URL of the computah-cast REST API (see ../computah-cast).
-        self.cast_url = env.get("CAST_URL", "http://localhost:8000").rstrip("/")
-        self.cast_timeout = int(env.get("CAST_TIMEOUT", "30"))
+        # Commands are routed through computah-engine, which forwards device
+        # calls (e.g. to computah-cast). Keeps STT and the LLM on one path.
+        self.engine_url = env.get(
+            "ENGINE_URL", "http://127.0.0.1:9000/commands"
+        ).rstrip("/")
+        self.engine_timeout = int(env.get("ENGINE_TIMEOUT", "30"))

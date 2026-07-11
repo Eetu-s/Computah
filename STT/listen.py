@@ -30,8 +30,12 @@ ENGINE_URL = os.environ.get("ENGINE_URL", "http://computah-engine:9000/commands"
 
 # Phrase -> command name. If a recognized sentence contains the phrase
 # (case-insensitive), the matching command is triggered. Add more rules here.
+# Commands run in the engine; device commands (e.g. cast-image) are forwarded
+# by the engine to computah-cast — same unified path the LLM agent uses.
 COMMAND_PHRASES = {
     "led on": "turn-on-led",
+    "show the picture": "cast-image",
+    "turn on the tv": "tv-power",
 }
 
 # Optional: pick a specific input device by index (see `python -m sounddevice`).

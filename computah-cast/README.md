@@ -40,9 +40,13 @@ MQTT is still used for **power/pairing/keys** even in `dlna` mode.
 
 ## Quick start (Docker Compose on the Pi)
 
-1. Edit `docker-compose.yml` and set at least `TV_IP` and `TV_MAC`.
-2. (Optional) drop a starting image at `./data/current.jpg`.
-3. Build and run:
+There is one common compose at the repo root; `computah-cast` runs under both
+speech paths.
+
+1. In the **root** `docker-compose.yml`, set at least `TV_IP` and `TV_MAC` on
+   the `computah-cast` service.
+2. (Optional) drop a starting image at `./computah-cast/data/current.jpg`.
+3. From the repo root, build and run (either profile brings cast up):
 
    ```bash
    docker compose up -d --build
