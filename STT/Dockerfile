@@ -21,7 +21,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app ./app
+COPY core.py listen.py ./
 
 # Listen to the microphone and POST completed sentences to POST_URL.
-CMD ["python", "-m", "app.listen"]
+CMD ["python", "listen.py"]

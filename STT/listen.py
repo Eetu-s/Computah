@@ -6,8 +6,8 @@ event when an utterance ends, so we post one whole sentence at a time — no
 manual silence timer needed.
 
 Usage:
-    python -m app.listen                     # print sentences to the console
-    POST_URL=http://consumer:9000/ingest python -m app.listen
+    python listen.py                         # print sentences to the console
+    POST_URL=http://consumer:9000/ingest python listen.py
 
 Requires a microphone. In Docker, pass the host sound devices through
 (see the ``mic`` service in docker-compose.yml).
@@ -22,7 +22,7 @@ import time
 import requests
 from moonshine_voice import MicTranscriber, TranscriptEventListener
 
-from .core import DEFAULT_MODEL, resolve_model
+from core import DEFAULT_MODEL, resolve_model
 
 # Where to POST completed sentences. If unset, sentences are only printed.
 POST_URL = os.environ.get("POST_URL")

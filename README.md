@@ -62,19 +62,25 @@ docker buildx build --platform linux/arm64 \
 ## Local development (native Linux with a mic)
 
 ```bash
+cd STT
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt          # needs system libportaudio2
-POST_URL=http://localhost:9000/ingest python -m app.listen
+POST_URL=http://localhost:9000/ingest python listen.py
 ```
 
 ## Project layout
 
 ```
-app/
-  core.py     # model resolution (which Moonshine model to load)
-  listen.py   # mic listener: transcribe + POST each completed sentence
-Dockerfile
-docker-compose.yml
+STT/                  # speech-to-text service (mic → transcribe → POST)
+  core.py             # model resolution (which Moonshine model to load)
+  listen.py           # mic listener: transcribe + POST each completed sentence
+  Dockerfile
+  requirements.txt
+engine/               # command executor (receives commands, runs them)
+  app.py
+  commands/           # one module per command (e.g. turn_on_led.py)
+  Dockerfile
+docker-compose.yml    # runs both services
 Makefile
 ```
 

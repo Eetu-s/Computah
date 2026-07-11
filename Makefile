@@ -5,14 +5,14 @@ MODEL ?= tiny
 
 .PHONY: build cross-build up down logs
 
-# Build the image natively (run this on the Pi, or on any 64-bit machine).
+# Build the STT (mic) image natively (run this on the Pi, or any 64-bit machine).
 build:
-	docker build --build-arg MOONSHINE_MODEL=$(MODEL) -t $(IMAGE) .
+	docker build --build-arg MOONSHINE_MODEL=$(MODEL) -t $(IMAGE) STT
 
-# Build for the Pi (arm64) from an x86 machine using buildx.
+# Build the STT image for the Pi (arm64) from an x86 machine using buildx.
 cross-build:
 	docker buildx build --platform linux/arm64 \
-		--build-arg MOONSHINE_MODEL=$(MODEL) -t $(IMAGE) --load .
+		--build-arg MOONSHINE_MODEL=$(MODEL) -t $(IMAGE) --load STT
 
 # Start the mic listener (needs a mic + /dev/snd; Pi/native Linux only).
 up:
