@@ -1,13 +1,14 @@
-"""Microphone listener: transcribe speech from a mic and POST each completed
-sentence to another service.
+"""Microphone listener: transcribe speech, match it to a command, and POST that
+command to the engine.
 
 Moonshine does its own voice-activity detection and emits a ``LineCompleted``
-event when an utterance ends, so we post one whole sentence at a time — no
-manual silence timer needed.
+event when an utterance ends, so we look at one whole sentence at a time — no
+manual silence timer needed. If the sentence contains a known phrase, we POST
+to the engine's matching command endpoint (``ENGINE_URL/<command>``).
 
 Usage:
-    python listen.py                         # print sentences to the console
-    POST_URL=http://consumer:9000/ingest python listen.py
+    python listen.py
+    ENGINE_URL=http://computah-engine:9000/commands python listen.py
 
 Requires a microphone. In Docker, pass the host sound devices through
 (see the ``mic`` service in docker-compose.yml).
@@ -22,21 +23,36 @@ import time
 import requests
 from moonshine_voice import MicTranscriber, TranscriptEventListener
 
-from core import DEFAULT_MODEL, resolve_model
+from core import resolve_model
 
-# Where to POST completed sentences. If unset, sentences are only printed.
-POST_URL = os.environ.get("POST_URL")
+# Base URL of the engine's command endpoints; a command name is appended.
+ENGINE_URL = os.environ.get("ENGINE_URL", "http://computah-engine:9000/commands").rstrip("/")
+
+# Phrase -> command name. If a recognized sentence contains the phrase
+# (case-insensitive), the matching command is triggered. Add more rules here.
+COMMAND_PHRASES = {
+    "led on": "turn-on-led",
+}
 
 # Optional: pick a specific input device by index (see `python -m sounddevice`).
 _MIC_DEVICE = os.environ.get("MOONSHINE_MIC_DEVICE")
 MIC_DEVICE = int(_MIC_DEVICE) if _MIC_DEVICE not in (None, "") else None
 
 
-class PostingListener(TranscriptEventListener):
-    """Prints each completed sentence and (optionally) POSTs it to POST_URL."""
+def match_command(text: str) -> str | None:
+    """Return the command name for the first phrase found in ``text``, or None."""
+    lowered = text.lower()
+    for phrase, command in COMMAND_PHRASES.items():
+        if phrase in lowered:
+            return command
+    return None
 
-    def __init__(self, url: str | None) -> None:
-        self.url = url
+
+class CommandListener(TranscriptEventListener):
+    """Prints each completed sentence and POSTs matched commands to the engine."""
+
+    def __init__(self, engine_url: str) -> None:
+        self.engine_url = engine_url
         self.session = requests.Session()
 
     def on_line_completed(self, event) -> None:
@@ -46,20 +62,18 @@ class PostingListener(TranscriptEventListener):
 
         print(f"> {text}", flush=True)
 
-        if not self.url:
+        command = match_command(text)
+        if command is None:
             return
 
-        payload = {
-            "text": text,
-            "start_time": event.line.start_time,
-            "duration": event.line.duration,
-            "model": DEFAULT_MODEL,
-        }
+        url = f"{self.engine_url}/{command}"
+        payload = {"text": text}
         try:
-            resp = self.session.post(self.url, json=payload, timeout=5)
+            resp = self.session.post(url, json=payload, timeout=5)
             resp.raise_for_status()
+            print(f"  → triggered '{command}'", flush=True)
         except requests.RequestException as exc:
-            print(f"POST to {self.url} failed: {exc}", file=sys.stderr)
+            print(f"POST to {url} failed: {exc}", file=sys.stderr)
 
 
 def main() -> int:
@@ -70,10 +84,10 @@ def main() -> int:
         model_arch=model_arch,
         device=MIC_DEVICE,
     )
-    mic.add_listener(PostingListener(POST_URL))
+    mic.add_listener(CommandListener(ENGINE_URL))
 
-    target = POST_URL or "(console only — set POST_URL to forward)"
-    print(f"Listening on the microphone. Posting sentences to: {target}", file=sys.stderr)
+    print(f"Listening on the microphone. Commands go to: {ENGINE_URL}/<command>", file=sys.stderr)
+    print(f"Known phrases: {', '.join(COMMAND_PHRASES)}", file=sys.stderr)
     print("Press Ctrl+C to stop.", file=sys.stderr)
 
     mic.start()

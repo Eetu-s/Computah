@@ -18,8 +18,8 @@ services:
     environment:
       MOONSHINE_MODEL: tiny
       OMP_NUM_THREADS: "4"
-      # Where to send completed sentences (adjust host/port/path to your service).
-      POST_URL: "http://computah-engine:9000/processCommand" #TODO PLACEHOLDER
+      # Base URL of the engine's commands; a matched command name is appended.
+      ENGINE_URL: "http://computah-engine:9000/commands"
       # Optional: input device index (see `python -m sounddevice`).
       # MOONSHINE_MIC_DEVICE: "1"
     # Guard against runaway memory on a 4GB Pi.
