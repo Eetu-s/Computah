@@ -1,0 +1,28 @@
+services:
+  computah-cast:
+    build: .
+    image: computah-cast:latest
+    container_name: computah-cast
+    # host networking is REQUIRED so the container can:
+    #   * send/receive SSDP multicast for DLNA discovery
+    #   * broadcast Wake-on-LAN packets
+    #   * be reached by the TV on HTTP_PORT for the image
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      # --- target TV (change these) ---
+      TV_IP: "192.168.0.238"
+      TV_MAC: "ff:ff:ff:ff"
+      # --- how the image reaches the screen ---
+      DISPLAY_METHOD: "dlna"        # or "browser"
+      HTTP_PORT: "8000"
+      AUTO_CAST: "true"
+      WAKE_ON_CAST: "true"
+      # --- optional seed image (place a file in ./data) ---
+      # DEFAULT_IMAGE: "/data/default.jpg"
+      # --- MQTT control (power / pairing / keys) ---
+      MQTT_ENABLED: "true"
+      MQTT_TLS: "true"
+      # ADVERTISE_IP: "192.168.1.10"  # set if auto-detection picks the wrong NIC
+    volumes:
+      - ./data:/data
