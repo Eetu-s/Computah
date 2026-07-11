@@ -30,3 +30,20 @@ services:
       - "/dev/snd:/dev/snd"
     group_add:
       - audio
+    depends_on:
+      - computah-engine
+
+  # Command executor: runs a named command at POST /commands/<name>.
+  # Commands are modular — add one by dropping a module in engine/commands/.
+  # First example: turn-on-led (POST /commands/turn-on-led).
+  computah-engine:
+    build:
+      context: ./engine
+    image: computah-engine
+    container_name: computah-engine
+    environment:
+      PORT: "9000"
+      COMMANDS_PREFIX: "/commands"
+    ports:
+      - "9000:9000"
+    restart: unless-stopped
