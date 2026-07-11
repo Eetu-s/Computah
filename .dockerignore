@@ -1,0 +1,11 @@
+.git
+.gitignore
+README.md
+Makefile
+docker-compose.yml
+**/__pycache__
+*.pyc
+.venv
+venv
+samples/*
+!samples/.gitkeep

@@ -1,0 +1,13 @@
+# Moonshine speech-to-text. Ships a prebuilt native inference library (with an
+# aarch64/Raspberry Pi wheel) and bundles the tiny-en model, so no PyTorch and
+# no model download for the default English setup.
+moonshine-voice
+
+# Audio decoding (wav/flac/ogg...). The native library handles resampling.
+soundfile
+numpy
+
+# HTTP service.
+fastapi
+uvicorn
+python-multipart

@@ -1,0 +1,27 @@
+services:
+  moonshine:
+    build:
+      context: .
+      args:
+        # "tiny" is bundled/offline. Change to "base" for higher accuracy
+        # (downloaded on first run, so needs network once).
+        MOONSHINE_MODEL: tiny
+    image: computah-moonshine
+    container_name: moonshine-stt
+    ports:
+      - "8000:8000"
+    environment:
+      MOONSHINE_MODEL: tiny
+      OMP_NUM_THREADS: "4"
+    # Guard against runaway memory on a 4GB Pi.
+    mem_limit: 2g
+    restart: unless-stopped
+    # Mount local audio for the CLI: files in ./samples appear at /data.
+    volumes:
+      - ./samples:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
