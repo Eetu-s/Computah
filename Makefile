@@ -2,9 +2,8 @@
 
 IMAGE ?= computah-moonshine
 MODEL ?= tiny
-FILE  ?= samples/beckett.wav
 
-.PHONY: build up down logs transcribe health cross-build
+.PHONY: build cross-build up down logs
 
 # Build the image natively (run this on the Pi, or on any 64-bit machine).
 build:
@@ -15,7 +14,7 @@ cross-build:
 	docker buildx build --platform linux/arm64 \
 		--build-arg MOONSHINE_MODEL=$(MODEL) -t $(IMAGE) --load .
 
-# Start the HTTP service (http://localhost:8000).
+# Start the mic listener (needs a mic + /dev/snd; Pi/native Linux only).
 up:
 	docker compose up -d --build
 
@@ -24,15 +23,3 @@ down:
 
 logs:
 	docker compose logs -f
-
-health:
-	curl -s http://localhost:8000/health
-
-# Transcribe a file via the running HTTP service: make transcribe FILE=samples/x.wav
-transcribe:
-	curl -s -F "file=@$(FILE)" http://localhost:8000/transcribe
-
-# Transcribe a file with the one-shot CLI (no server needed).
-cli:
-	docker run --rm -v "$(PWD)/samples:/data" $(IMAGE) \
-		python -m app.transcribe /data/$(notdir $(FILE))

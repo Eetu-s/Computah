@@ -1,13 +1,9 @@
 # Moonshine speech-to-text. Ships a prebuilt native inference library (with an
 # aarch64/Raspberry Pi wheel) and bundles the tiny-en model, so no PyTorch and
-# no model download for the default English setup.
+# no model download for the default English setup. Microphone capture uses its
+# bundled `sounddevice` (needs system libportaudio2 — installed in the image).
 moonshine-voice
 
-# Audio decoding (wav/flac/ogg...). The native library handles resampling.
-soundfile
-numpy
-
-# HTTP service.
-fastapi
-uvicorn
-python-multipart
+# POST completed sentences to another service.
+# (requests is already pulled in by moonshine-voice; pinned here for clarity.)
+requests

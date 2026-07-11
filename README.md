@@ -1,33 +1,38 @@
-# computah — Dockerized Moonshine speech-to-text for Raspberry Pi
+# computah — Dockerized Moonshine microphone speech-to-text for Raspberry Pi
 
-A small, self-contained speech-to-text service built on
+Listens to a USB microphone on a Raspberry Pi, transcribes speech with
 [Moonshine](https://github.com/moonshine-ai/moonshine) (the `moonshine-voice`
-package). 
+package)
 
+```
+USB mic → Moonshine (in-process) → on each completed sentence → HTTP POST 
+```
+
+Each completed sentence is POSTed as JSON:
+
+```json
+{"text": "hello there", "start_time": 1.2, "duration": 0.9, "model": "tiny"}
+```
 
 ## Requirements
 
 - A **64-bit** Raspberry Pi OS (aarch64) with Docker.
-- Audio in a common format (wav/flac/ogg/…); it's downmixed to mono and the
-  native library resamples it to what the model needs.
+- A **USB microphone** 
 
 ## Quick start (on the Pi)
 
 ```bash
-# Build the image (bundles the tiny-en model, no downloads).
-make build            # or: docker build -t computah-moonshine .
+# 1. Point POST_URL at your consumer service in docker-compose.yml
+#   (only has a place holder for now)
 
-# Start the HTTP service on port 8000.
-make up               # or: docker compose up -d --build
+# 2. Build and start the listener.
+make up                 # or: docker compose up -d --build
 
-# Check it's alive.
-curl http://localhost:8000/health
-# {"status":"ok","model":"tiny"}
-
-# Transcribe the included sample.
-curl -F "file=@samples/yoursample.wav" http://localhost:8000/transcribe
-# {"text":"What ever your sample has transcribed here as text","model":"tiny","seconds":_}
+# 3. Watch recognized sentences.
+docker compose logs -f
 ```
+
+Speak into the mic; each completed sentence is printed and POSTed to `POST_URL`.
 
 ## Building on an x86 machine for the Pi
 
@@ -43,31 +48,33 @@ docker buildx build --platform linux/arm64 \
 
 | Variable / arg | Default | Notes |
 | --- | --- | --- |
+| `POST_URL` | `http://consumer:9000/ingest` | Where sentences are POSTed. Unset → print only. |
 | `MOONSHINE_MODEL` | `tiny` | `tiny` (bundled/offline) or `base` (downloaded, more accurate). |
 | `MOONSHINE_LANGUAGE` | `en` | Non-English models are downloaded on first use. |
+| `MOONSHINE_MIC_DEVICE` | (auto) | Input device index; list with `python -m sounddevice`. |
 | `OMP_NUM_THREADS` | `4` | Inference threads; match the Pi's cores. |
 | `mem_limit` (compose) | `2g` | Safety cap for a 4 GB Pi. |
 
 > `base` and non-English models are fetched (and cached) on first use, so the
 > container needs network access once. The default `tiny-en` needs none.
 
-## HTTP API
 
-| Method | Path | Body | Response |
-| --- | --- | --- | --- |
-| `GET` | `/health` | — | `{"status","model"}` |
-| `POST` | `/transcribe` | multipart file field `file` | `{"text","model","seconds"}` |
+## Local development (native Linux with a mic)
 
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt          # needs system libportaudio2
+POST_URL=http://localhost:9000/ingest python -m app.listen
+```
 
 ## Project layout
 
 ```
 app/
-  core.py         # model loading + audio decode + inference (shared)
-  transcribe.py   # CLI entry point
-  server.py       # FastAPI HTTP service
+  core.py     # model resolution (which Moonshine model to load)
+  listen.py   # mic listener: transcribe + POST each completed sentence
 Dockerfile
 docker-compose.yml
 Makefile
-samples/          # audio test clip
+```
 

@@ -1,5 +1,12 @@
 services:
-  moonshine:
+  # Microphone listener: transcribes speech from a USB mic and POSTs each
+  # completed sentence to POST_URL.
+  #
+  # Requires a mic on the host and a real Linux host (e.g. the Pi). The mic is
+  # passed in via /dev/snd; this can't work on WSL (no audio device).
+  #   docker compose up -d
+  #   docker compose logs -f
+  mic:
     build:
       context: .
       args:
@@ -7,21 +14,19 @@ services:
         # (downloaded on first run, so needs network once).
         MOONSHINE_MODEL: tiny
     image: computah-moonshine
-    container_name: moonshine-stt
-    ports:
-      - "8000:8000"
+    container_name: moonshine-mic
     environment:
       MOONSHINE_MODEL: tiny
       OMP_NUM_THREADS: "4"
+      # Where to send completed sentences (adjust host/port/path to your service).
+      POST_URL: "http://computah-engine:9000/processCommand" #TODO PLACEHOLDER
+      # Optional: input device index (see `python -m sounddevice`).
+      # MOONSHINE_MIC_DEVICE: "1"
     # Guard against runaway memory on a 4GB Pi.
     mem_limit: 2g
     restart: unless-stopped
-    # Mount local audio for the CLI: files in ./samples appear at /data.
-    volumes:
-      - ./samples:/data
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health').status==200 else 1)"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
+    # Pass the host sound devices into the container so it can reach the mic.
+    devices:
+      - "/dev/snd:/dev/snd"
+    group_add:
+      - audio

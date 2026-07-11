@@ -10,9 +10,9 @@ ENV MOONSHINE_MODEL=${MOONSHINE_MODEL} \
     # Keep thread count modest for a 4-core Pi.
     OMP_NUM_THREADS=4
 
-# libsndfile1: audio decoding for soundfile.
+# libportaudio2: microphone capture for the mic listener (sounddevice).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libsndfile1 \
+    && apt-get install -y --no-install-recommends libportaudio2 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -23,9 +23,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 
-EXPOSE 8000
-
-# Default: run the HTTP service. Override the command to use the CLI, e.g.
-#   docker run --rm -v "$PWD/samples:/data" computah-moonshine \
-#       python -m app.transcribe /data/recording.wav
-CMD ["uvicorn", "app.server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Listen to the microphone and POST completed sentences to POST_URL.
+CMD ["python", "-m", "app.listen"]
