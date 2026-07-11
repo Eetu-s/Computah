@@ -34,6 +34,33 @@ docker compose logs -f
 
 Speak into the mic; each completed sentence is printed and POSTed to `POST_URL`.
 
+## Choosing the speech-input path (STT vs agent)
+
+There are two ways to turn speech into commands, selected by the
+`COMPOSE_PROFILES` environment variable (defaulted in `.env`). Only the chosen
+path's containers are built and started — the other is not included at all.
+
+| `COMPOSE_PROFILES` | Speech containers | What it is |
+| --- | --- | --- |
+| `stt` (default) | `mic` | Cheap, offline Moonshine STT with exact phrase→command matching. |
+| `agent` | `agent` + `llama` | Multimodal LLM (Gemma 4 via llama.cpp) that interprets speech and picks tools. |
+
+`computah-engine` (the command executor) runs under **both** paths — it's shared
+infrastructure that will be used more over time.
+
+```bash
+make up              # uses the default from .env (stt)
+make up-agent        # run the LLM path instead
+make up-stt          # force the STT path
+
+# or directly:
+COMPOSE_PROFILES=agent docker compose up -d --build
+```
+
+Change the default by editing `COMPOSE_PROFILES` in `.env`. The `agent` path's
+service definitions are reused (via `extends`) from
+`computah-agent/docker-compose.yml`, so there's a single source of truth.
+
 ## Building on an x86 machine for the Pi
 
 If you build on a laptop/desktop instead of the Pi, cross-build for arm64:
