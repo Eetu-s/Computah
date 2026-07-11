@@ -1,0 +1,8 @@
+# Microphone capture (needs system libportaudio2 — installed in the image).
+sounddevice
+
+# Frame RMS for the voice-activity detector.
+numpy
+
+# Talking to llama-server and to computah-cast.
+requests
